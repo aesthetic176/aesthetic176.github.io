@@ -1,200 +1,131 @@
-//attach to HTML elements
-const letters = document.querySelectorAll('.tile');
-const boardRows = document.querySelectorAll('.board-row');
-const banner = document.querySelector('.banner');
-const onscreenKeyboardButtons = document.querySelectorAll('.key');
+document.addEventListener("DOMContentLoaded", ()=>{
+  createSquare();
+  let avilablespace = 1;
+  let guessWord = [[]];
+  const keys = document.querySelectorAll(".keyboard-row button");
+  let word = "devil" //for checking
 
-(async function init() {
-  //initialize app state
-  let currentGuess = '';
-  let currentRow = 0;
-  let isGameOver = false;z
-  const ANSWER_LENGTH = 5;
-  const ROUNDS = 6;
+  let guessWordcount = 0
 
-  //grab word of the day
-  const res = await fetch('https://words.dev-apis.com/word-of-the-day');
-  const resObj = await res.json();
-  const word = resObj.word.toUpperCase();
-  const solutionLetters = word.split('');
-  console.log(word);
+  // console.log(keys);
 
-  //add event listeners to onscreen keyboard buttons
-  Array.from(onscreenKeyboardButtons).forEach((key) => {
-    key.addEventListener('click', (event) => {
-      let input = event.target.dataset.key;
 
-      switch (true) {
-        case isLetter(input):
-          addLetter(input.toUpperCase());
-          break;
-        case input === '↵':
-          commit();
-          break;
-        case input === '←':
-          backspace();
-          break;
-        default:
-          console.log('error in event listener delegation');
+  function getCorrectWordArr(){
+      const NumberofGussedword = guessWord.length;
+      return guessWord[NumberofGussedword-1];
+
+  }
+
+  function getTilecolor(letter,index){
+      const isCorrectLetter = word.includes(letter)
+
+      if(!isCorrectLetter){
+          return "rgb(58 , 58 ,60)"
       }
-    });
-  });
+      const letterInthePosition = word.charAt(index)
+      const isCorrectPosition = letter === letterInthePosition
 
-  document.addEventListener('keydown', (e) => {
-    if (isGameOver) {
-      return;
-    }
+      if (isCorrectPosition){
+          return "rgb(255,1,0)"
+      }
 
-    const action = e.key.toUpperCase();
-    switch (action) {
-      case 'Enter':
-        commit();
-        break;
-      case 'Backspace':
-        backspace();
-        break;
-      default:
-        if (isLetter(action)) {
-          addLetter(action);
-        } else {
-          console.error('Key not recognized');
+      return "rgb(181,159,59)"
+  }
+
+  function HandleSumbit(){
+      const CurrentwordArr = getCorrectWordArr();
+      if(CurrentwordArr.length!==5){
+
+          window.alert("Word must be 5 letter ");
+
+
+      }
+      const currentword = CurrentwordArr.join("");
+
+      const firstLetterid = guessWordcount * 5 + 1
+      const interval = 200;
+      CurrentwordArr.forEach((letter,index) =>{
+          setTimeout(()=>{
+              const tilecolor = getTilecolor(letter , index);
+              const letterid = firstLetterid +index ;
+              const letterel = document.getElementById(letterid);
+              letterel.style = `background-color:${tilecolor};border-color:${tilecolor}`;
+
+          }, interval * index);
+      }) ;
+      guessWordcount +=1  ;
+
+
+
+      if(currentword === word){
+          window.alert("Congratulations")
+      }
+
+      if(guessWord.length ===6){
+          window.alert("YOU LOST")
+      }
+
+      guessWord.push([]);
+
+
+  }
+  function updateGuessWords(letter){
+      const CurrentwordArr = getCorrectWordArr();
+
+      if(CurrentwordArr && CurrentwordArr.length<5){
+          CurrentwordArr.push(letter);
+
+          const availableEL = document.getElementById(String(avilablespace));
+          avilablespace = avilablespace + 1;
+
+          availableEL.textContent = letter;
+
+      }
+
+  }
+  function createSquare(){
+      const game_board = document.getElementById("board")
+
+      for(let index = 0; index < 30; index++){
+          let square = document.createElement("div");
+          square.classList.add("square");
+          square.classList.add("animate__animated");
+
+          square.setAttribute("id",index+1);
+          game_board.appendChild(square);
+      }
+  }
+  function handleDelet(){
+      const CurrentwordArr = getCorrectWordArr();
+      const removedLetter = CurrentwordArr.pop();
+
+      guessWord[guessWord.length - 1] = CurrentwordArr;
+
+      const lastLetterEl = document.getElementById(String(avilablespace - 1));
+
+      lastLetterEl.textContent = "";
+      avilablespace = avilablespace - 1;
+
+  }
+
+  for(let i = 0; i<keys.length; i++){
+      keys[i].onclick = ({target}) => {
+
+        const letter = target.getAttribute("data-key");
+
+        if (letter === "enter"){
+          HandleSumbit();
+          return;
+
         }
-    }
-  });
 
-  function backspace() {
-    currentGuess = currentGuess.substring(0, currentGuess.length - 1);
-    letters[ANSWER_LENGTH * currentRow + currentGuess.length].innerText = '';
+        if(letter == "del"){
+          handleDelet();
+          return;
+        }
+
+        updateGuessWords(letter);
+
+      };
   }
-
-  setTileIDs();
-
-  function addLetter(letter) {
-    if (currentGuess.length < ANSWER_LENGTH) {
-      currentGuess += letter;
-    } else {
-      currentGuess = currentGuess.substring(0, currentGuess.length - 1) + letter;
-    }
-
-    //draws the character to the screen
-    letters[ANSWER_LENGTH * currentRow + currentGuess.length - 1].innerText = letter;
-
-    //adds a small animation when adding a letter
-    letters[ANSWER_LENGTH * currentRow + currentGuess.length - 1].classList.add('pop');
-    setTimeout(() => {
-      letters[ANSWER_LENGTH * currentRow + currentGuess.length - 1].classList.remove('pop');
-    }, 100);
-  }
-
-  async function commit() {
-    if (currentGuess.length != ANSWER_LENGTH) {
-      return;
-    }
-
-    const res = await fetch('https://words.dev-apis.com/validate-word', {
-      method: 'POST',
-      body: JSON.stringify({ word: currentGuess }),
-    });
-
-    const resObj = await res.json();
-    const validWord = resObj.validWord;
-    //check the guess
-    if (!validWord) {
-      //make the board row shake if guess is incorrect
-      boardRows[currentRow].classList.add('shake');
-      setTimeout(() => {
-        boardRows[currentRow].classList.remove('shake');
-      }, 850);
-      return;
-    }
-
-    //map the letters in the solution to an object that keeps track of each instance of the letter.
-    //this is needed to properly color the tiles
-    const letterMap = makeMap(solutionLetters);
-    console.log(solutionLetters);
-    console.dir(letterMap);
-    const guessParts = currentGuess.split('');
-
-    for (let i = 0; i < ANSWER_LENGTH; i++) {
-      //if the letter of the players guess is in the correct tile, add the "correct" class to
-      //the tile and keyboard section
-      if (guessParts[i] === solutionLetters[i]) {
-        letters[currentRow * ANSWER_LENGTH + i].classList.add('correct');
-
-        onscreenKeyboardButtons.forEach((key) => {
-          if (key.dataset.key.toUpperCase() === guessParts[i]) {
-            key.classList.add('correct');
-          }
-        });
-        letterMap[guessParts[i]]--;
-      }
-    }
-
-    //iterate through the letters in the guess and mark the letters as close or wrong
-    for (let i = 0; i < ANSWER_LENGTH; i++) {
-      let currentLetter = guessParts[i];
-      if (currentLetter === solutionLetters[i]) {
-        // do nothing
-      } else if (solutionLetters.includes(currentLetter) && letterMap[currentLetter] > 0) {
-        //add color class to letter tile
-        letters[currentRow * ANSWER_LENGTH + i].classList.add('close');
-
-        //add color class to keyboard key
-        onscreenKeyboardButtons.forEach((key) => {
-          if (key.dataset.key.toUpperCase() === currentLetter) {
-            key.classList.add('close');
-          }
-        });
-        letterMap[currentLetter]--;
-      } else {
-        //add color class to letter tile
-        letters[currentRow * ANSWER_LENGTH + i].classList.add('wrong');
-
-        //add color class to keyboard key
-        onscreenKeyboardButtons.forEach((key) => {
-          if (key.dataset.key === currentLetter) {
-            key.classList.add('wrong');
-          }
-        });
-      }
-    }
-
-    currentRow++;
-
-    if (currentGuess === word) {
-      isGameOver = true;
-      banner.classList.add('win');
-      banner.textContent = "You've Won";
-      return;
-    } else if (currentRow === ROUNDS) {
-      banner.classList.add('lose');
-      banner.textContent = 'Better luck next time!';
-      isGameOver = true;
-    }
-
-    currentGuess = '';
-  }
-
-  function makeMap(array) {
-    const obj = {};
-    for (let i = 0; i < array.length; i++) {
-      const letter = array[i];
-      if (obj[letter]) {
-        obj[letter]++;
-      } else {
-        obj[letter] = 1;
-      }
-    }
-    return obj;
-  }
-
-  function isLetter(letter) {
-    return /^[a-zA-Z]$/.test(letter);
-  }
-
-  function setTileIDs() {
-    Array.from(letters).forEach((letter, i) => {
-      letter.id = `letter-${i}`;
-    });
-  }
-})();
+});
